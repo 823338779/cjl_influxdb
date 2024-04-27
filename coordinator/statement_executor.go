@@ -539,7 +539,7 @@ func (e *StatementExecutor) executeSetPasswordUserStatement(q *influxql.SetPassw
 }
 
 func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatement, ctx *query.ExecutionContext) error {
-	cur, err := e.createIterators(ctx, stmt, ctx.ExecutionOptions)
+	cur, err := e.createIterators(ctx, stmt, ctx.ExecutionOptions) // 这里面执行真正的查询，cur理解为查询的结果
 	if err != nil {
 		return err
 	}
@@ -558,7 +558,7 @@ func (e *StatementExecutor) executeSelectStatement(stmt *influxql.SelectStatemen
 	}
 
 	for {
-		row, partial, err := em.Emit()
+		row, partial, err := em.Emit() // 这里获取的就已经是条件筛选之后的结果集了
 		if err != nil {
 			return err
 		} else if row == nil {

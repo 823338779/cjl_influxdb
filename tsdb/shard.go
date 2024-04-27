@@ -514,7 +514,6 @@ const (
 // will store points written stats into the int64 pointer associated with
 // StatPointsWritten and the number of values written in the int64 pointer
 // stored in the StatValuesWritten context values.
-//
 func (s *Shard) WritePointsWithContext(ctx context.Context, points []models.Point) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -893,6 +892,7 @@ func (s *Shard) WriteTo(w io.Writer) (int64, error) {
 }
 
 // CreateIterator returns an iterator for the data in the shard.
+// 这里已经在筛选结果序列了？？？？？
 func (s *Shard) CreateIterator(ctx context.Context, m *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error) {
 	engine, err := s.Engine()
 	if err != nil {

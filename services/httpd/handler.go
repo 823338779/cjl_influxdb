@@ -480,6 +480,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 	defer func(start time.Time) {
 		atomic.AddInt64(&h.stats.QueryRequestDuration, time.Since(start).Nanoseconds())
 	}(time.Now())
+
 	h.requestTracker.Add(r, user)
 
 	// Retrieve the underlying ResponseWriter or initialize our own.
@@ -520,6 +521,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 
 	// Sanitize the request query params so it doesn't show up in the response logger.
 	// Do this before anything else so a parsing error doesn't leak passwords.
+	// 去除请求中的敏感信息比如密码等数据
 	sanitize(r)
 
 	// Parse the parameters
@@ -628,19 +630,19 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 		}
 	}
 
-	// Execute query.
+	// 执行从查询
 	results := h.QueryExecutor.ExecuteQuery(q, opts, closing)
 
 	// If we are running in async mode, open a goroutine to drain the results
 	// and return with a StatusNoContent.
-	if async {
+	if async { // 如果需要异步查询，那么在异步协程中订阅这个results的信道，用来监听结果集，这时候的结果集已经没啥用了，也不会返回给请求的调用者
 		go h.async(q, results)
 		h.writeHeader(w, http.StatusNoContent)
 		return
 	}
 
 	// if we're not chunking, this will be the in memory buffer for all results before sending to client
-	resp := Response{Results: make([]*query.Result, 0)}
+	queryResponse := Response{Results: make([]*query.Result, 0)}
 
 	// Status header is OK once this point is reached.
 	// Attempt to flush the header immediately so the client gets the header information
@@ -706,16 +708,16 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 		// Results for statements need to be combined together.
 		// We need to check if this new result is for the same statement as
 		// the last result, or for the next statement
-		l := len(resp.Results)
+		l := len(queryResponse.Results)
 		if l == 0 {
-			resp.Results = append(resp.Results, r)
-		} else if resp.Results[l-1].StatementID == r.StatementID {
+			queryResponse.Results = append(queryResponse.Results, r)
+		} else if queryResponse.Results[l-1].StatementID == r.StatementID {
 			if r.Err != nil {
-				resp.Results[l-1] = r
+				queryResponse.Results[l-1] = r
 				continue
 			}
 
-			cr := resp.Results[l-1]
+			cr := queryResponse.Results[l-1]
 			rowsMerged := 0
 			if len(cr.Series) > 0 {
 				lastSeries := cr.Series[len(cr.Series)-1]
@@ -738,7 +740,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 			cr.Messages = append(cr.Messages, r.Messages...)
 			cr.Partial = r.Partial
 		} else {
-			resp.Results = append(resp.Results, r)
+			queryResponse.Results = append(queryResponse.Results, r)
 		}
 
 		// Drop out of this loop and do not process further results when we hit the row limit.
@@ -758,7 +760,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user meta.U
 
 	// If it's not chunked we buffered everything in memory, so write it out
 	if !chunked {
-		n, _ := rw.WriteResponse(resp)
+		n, _ := rw.WriteResponse(queryResponse)
 		atomic.AddInt64(&h.stats.QueryRequestBytesTransmitted, int64(n))
 	}
 }
@@ -788,7 +790,6 @@ func (h *Handler) async(q *influxql.Query, results <-chan *query.Result) {
 // in the database URL query value.  It is encoded using a forward slash like
 // "database/retentionpolicy" and we should be able to simply split that string
 // on the forward slash.
-//
 func bucket2dbrp(bucket string) (string, string, error) {
 	// test for a slash in our bucket name.
 	switch idx := strings.IndexByte(bucket, '/'); idx {

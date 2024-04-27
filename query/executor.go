@@ -233,6 +233,7 @@ func (e *Executor) WithLogger(log *zap.Logger) {
 
 // ExecuteQuery executes each statement within a query.
 func (e *Executor) ExecuteQuery(query *influxql.Query, opt ExecutionOptions, closing chan struct{}) <-chan *Result {
+	// 创建结果集对象
 	results := make(chan *Result)
 	go e.executeQuery(query, opt, closing, results)
 	return results

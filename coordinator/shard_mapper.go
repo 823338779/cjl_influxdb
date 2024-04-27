@@ -169,7 +169,7 @@ func (a *LocalShardMapping) CreateIterator(ctx context.Context, m *influxql.Meas
 		RetentionPolicy: m.RetentionPolicy,
 	}
 
-	sg := a.ShardMap[source]
+	sg := a.ShardMap[source] // 这里它已经把查询语句中的时间条件解析过了，限制了最小时间和最大时间，
 	if sg == nil {
 		return nil, nil
 	}
